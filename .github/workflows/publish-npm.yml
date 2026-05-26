@@ -53,11 +53,14 @@ jobs:
           node-version: 22
           registry-url: https://registry.npmjs.org
 
+      - name: Enable Corepack
+        run: corepack enable
+
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Typecheck
-        run: npm run check
+        run: pnpm run check
 
       - name: Configure release git author
         if: ${{ !inputs.dry_run && inputs.version_bump != 'none' }}
@@ -65,10 +68,15 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
+      - name: Preview bumped package version
+        if: ${{ inputs.dry_run && inputs.version_bump != 'none' }}
+        run: |
+          pnpm version "${{ inputs.version_bump }}" --no-git-tag-version
+
       - name: Bump package version
         if: ${{ !inputs.dry_run && inputs.version_bump != 'none' }}
         run: |
-          npm version "${{ inputs.version_bump }}" -m "chore(release): %s"
+          pnpm version "${{ inputs.version_bump }}" -m "chore(release): %s"
 
       - name: Show package contents
         run: npm pack --dry-run

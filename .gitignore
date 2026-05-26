@@ -1,6 +1,11 @@
 # Dependencies
 node_modules/
 
+# Alternate package manager lockfiles (pnpm-lock.yaml is canonical)
+package-lock.json
+yarn.lock
+bun.lockb
+
 # Build and coverage output
 dist/
 build/

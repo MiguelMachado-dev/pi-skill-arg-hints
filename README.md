@@ -87,8 +87,8 @@ will visually show:
 ## Development
 
 ```bash
-npm install
-npm run check
+pnpm install
+pnpm run check
 pi -e .
 ```
 
@@ -98,7 +98,7 @@ Publishing is handled by the manual GitHub Actions workflow in `.github/workflow
 
 Before using it, add an npm automation token as the repository secret `NPM_TOKEN`.
 Then open **Actions → Publish to npm → Run workflow**, choose the version bump and npm dist-tag, and run it.
-The workflow installs dependencies, typechecks, optionally bumps the package version, publishes to npm, and pushes the release commit/tag.
+The workflow installs dependencies with pnpm, typechecks, optionally bumps the package version, publishes to npm, and pushes the release commit/tag.
 
 ## License
 
