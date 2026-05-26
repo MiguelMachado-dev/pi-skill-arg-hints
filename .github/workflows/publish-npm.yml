@@ -1,0 +1,92 @@
+name: Publish to npm
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_bump:
+        description: Version bump to apply before publishing
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+          - none
+      dist_tag:
+        description: npm dist-tag for the published version
+        required: true
+        default: latest
+        type: choice
+        options:
+          - latest
+          - next
+          - beta
+      dry_run:
+        description: Validate the publish without uploading to npm
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish package
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run check
+
+      - name: Configure release git author
+        if: ${{ !inputs.dry_run && inputs.version_bump != 'none' }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Bump package version
+        if: ${{ !inputs.dry_run && inputs.version_bump != 'none' }}
+        run: |
+          npm version "${{ inputs.version_bump }}" -m "chore(release): %s"
+
+      - name: Show package contents
+        run: npm pack --dry-run
+
+      - name: Dry-run npm publish
+        if: ${{ inputs.dry_run }}
+        run: npm publish --access public --tag "$NPM_DIST_TAG" --dry-run
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_DIST_TAG: ${{ inputs.dist_tag }}
+
+      - name: Publish to npm
+        if: ${{ !inputs.dry_run }}
+        run: npm publish --access public --tag "$NPM_DIST_TAG" --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_DIST_TAG: ${{ inputs.dist_tag }}
+
+      - name: Push release commit and tag
+        if: ${{ !inputs.dry_run && inputs.version_bump != 'none' }}
+        run: git push --follow-tags
