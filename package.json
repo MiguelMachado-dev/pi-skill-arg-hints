@@ -1,0 +1,48 @@
+{
+  "name": "pi-skill-arg-hints",
+  "version": "1.0.0",
+  "description": "Inline argument-hint placeholders for Pi skill and prompt template slash commands.",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi",
+    "skills",
+    "prompt-templates",
+    "slash-commands"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MiguelMachado-dev/pi-skill-arg-hints.git"
+  },
+  "bugs": {
+    "url": "https://github.com/MiguelMachado-dev/pi-skill-arg-hints/issues"
+  },
+  "homepage": "https://github.com/MiguelMachado-dev/pi-skill-arg-hints#readme",
+  "type": "module",
+  "files": [
+    "extensions",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "check": "tsc --noEmit",
+    "pack:dry-run": "npm pack --dry-run",
+    "publish:dry-run": "npm publish --dry-run"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.0.0"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  }
+}
