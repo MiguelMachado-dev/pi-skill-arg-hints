@@ -80,6 +80,7 @@ will visually show:
 - Supports Pi skills invoked as `/skill:<name>`.
 - Supports Pi prompt templates invoked as `/<template-name>`.
 - Resolves files through Pi's command registry; no hardcoded skill/template paths.
+- Composes with other extensions that install a custom editor during session startup.
 - Shows the hint only when the command has no arguments yet.
 - Leaves the editor buffer unchanged, so placeholders are never submitted.
 - Does nothing for commands without `argument-hint`.

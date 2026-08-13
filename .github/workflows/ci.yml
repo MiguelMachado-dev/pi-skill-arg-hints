@@ -37,5 +37,8 @@ jobs:
       - name: Typecheck
         run: pnpm run check
 
+      - name: Test
+        run: pnpm test
+
       - name: Verify package contents
         run: pnpm run pack:dry-run

@@ -4,6 +4,7 @@ import {
 	CURSOR_MARKER,
 	truncateToWidth,
 	visibleWidth,
+	type EditorComponent,
 	type EditorTheme,
 	type TUI,
 } from "@earendil-works/pi-tui";
@@ -16,6 +17,19 @@ type InlineHint = {
 type ParsedSlashCommand = {
 	readonly commandName: string;
 	readonly hasArguments: boolean;
+};
+
+type EditorFactory = (
+	tui: TUI,
+	theme: EditorTheme,
+	keybindings: ConstructorParameters<typeof CustomEditor>[2],
+) => EditorComponent;
+
+type HintableEditor = EditorComponent & {
+	readonly focused?: boolean;
+	getCursor(): { line: number; col: number };
+	getPaddingX(): number;
+	isShowingAutocomplete(): boolean;
 };
 
 const FRONTMATTER_DELIMITER = "---";
@@ -96,33 +110,24 @@ async function readArgumentHint(resourcePath: string): Promise<string | null> {
 	return parseArgumentHint(markdown);
 }
 
-class SkillArgumentHintEditor extends CustomEditor {
+class SkillArgumentHintController {
 	private hint: InlineHint | null = null;
 	private readonly hintCache = new Map<string, string | null>();
 	private refreshVersion = 0;
 
 	constructor(
 		private readonly pi: ExtensionAPI,
-		tui: TUI,
-		theme: EditorTheme,
-		keybindings: ConstructorParameters<typeof CustomEditor>[2],
-	) {
-		super(tui, theme, keybindings);
-	}
+		private readonly tui: TUI,
+		private readonly editor: HintableEditor,
+	) {}
 
-	override handleInput(data: string): void {
-		super.handleInput(data);
-		void this.refreshHint();
-	}
-
-	override setText(text: string): void {
-		super.setText(text);
+	refresh(): void {
 		void this.refreshHint();
 	}
 
 	private async refreshHint(): Promise<void> {
 		const version = ++this.refreshVersion;
-		const text = this.getText();
+		const text = this.editor.getText();
 		const parsed = parseSlashCommand(text);
 
 		if (!parsed || parsed.hasArguments) {
@@ -152,7 +157,7 @@ class SkillArgumentHintEditor extends CustomEditor {
 			this.hintCache.set(resourcePath, hint);
 		}
 
-		if (version !== this.refreshVersion || this.getText() !== text) return;
+		if (version !== this.refreshVersion || this.editor.getText() !== text) return;
 
 		this.setHint(hint ? { commandText: text, hint } : null, version);
 	}
@@ -166,53 +171,100 @@ class SkillArgumentHintEditor extends CustomEditor {
 		if (changed) this.tui.requestRender();
 	}
 
-	override render(width: number): string[] {
-		const lines = super.render(width);
-		if (!this.hint || this.isShowingAutocomplete()) return lines;
+	render(lines: string[], width: number): string[] {
+		if (!this.hint || this.editor.isShowingAutocomplete()) return lines;
 
-		const text = this.getText();
+		const text = this.editor.getText();
 		if (text !== this.hint.commandText || text.includes("\n")) return lines;
 
-		const cursor = this.getCursor();
+		const cursor = this.editor.getCursor();
 		if (cursor.line !== 0 || cursor.col !== text.length) return lines;
 
-		// super.render() returns: top border, content line(s), bottom border, optional autocomplete.
+		// Editor.render() returns: top border, content line(s), bottom border, optional autocomplete.
 		if (lines.length < 3) return lines;
 
-		const paddingX = this.getPaddingX();
+		const maxPadding = Math.max(0, Math.floor((width - 1) / 2));
+		const paddingX = Math.min(this.editor.getPaddingX(), maxPadding);
 		const leftPadding = " ".repeat(paddingX);
 		const rightPadding = " ".repeat(paddingX);
 		const contentWidth = Math.max(1, width - paddingX * 2);
-		const cursorCell = this.focused ? `${CURSOR_MARKER}\x1b[7m \x1b[0m` : " ";
+		const cursorCell = this.editor.focused ? `${CURSOR_MARKER}\x1b[7m \x1b[0m` : " ";
 		const placeholder = `${INLINE_HINT_COLOR}${this.hint.hint}${RESET}`;
 		const visibleText = `${text} ${this.hint.hint}`;
-		const padding = " ".repeat(Math.max(0, contentWidth - visibleWidth(visibleText) - (this.focused ? 0 : 0)));
+		const padding = " ".repeat(Math.max(0, contentWidth - visibleWidth(visibleText)));
 
-		lines[1] = truncateToWidth(`${leftPadding}${text}${cursorCell}${placeholder}${padding}${rightPadding}`, width, "");
+		lines[1] = truncateToWidth(
+			`${leftPadding}${text}${cursorCell}${placeholder}${padding}${rightPadding}`,
+			width,
+			"",
+		);
 		return lines;
 	}
 }
 
+function isHintableEditor(editor: EditorComponent): editor is HintableEditor {
+	const candidate = editor as Partial<HintableEditor>;
+	return (
+		typeof candidate.getCursor === "function" &&
+		typeof candidate.getPaddingX === "function" &&
+		typeof candidate.isShowingAutocomplete === "function"
+	);
+}
+
+function addArgumentHints(editor: EditorComponent, pi: ExtensionAPI, tui: TUI): EditorComponent {
+	if (!isHintableEditor(editor)) return editor;
+
+	const controller = new SkillArgumentHintController(pi, tui, editor);
+	const handleInput = editor.handleInput.bind(editor);
+	const setText = editor.setText.bind(editor);
+	const render = editor.render.bind(editor);
+
+	editor.handleInput = (data: string) => {
+		handleInput(data);
+		controller.refresh();
+	};
+	editor.setText = (text: string) => {
+		setText(text);
+		controller.refresh();
+	};
+	editor.render = (width: number) => controller.render(render(width), width);
+
+	return editor;
+}
+
 export default function skillArgumentHints(pi: ExtensionAPI) {
-	let previousEditorFactory: unknown;
-	let installedEditorFactory: unknown;
+	let previousEditorFactory: EditorFactory | undefined;
+	let installedEditorFactory: EditorFactory | undefined;
 
-	pi.on("session_start", (_event, ctx) => {
-		previousEditorFactory = ctx.ui.getEditorComponent();
+	// Resource discovery runs after every extension's session_start handler, so editors
+	// installed during startup can be decorated instead of one extension replacing another.
+	pi.on("resources_discover", (_event, ctx) => {
+		const isNonInteractiveMode = "mode" in ctx && ctx.mode !== "tui";
+		const currentEditorFactory = ctx.ui.getEditorComponent();
+		if (
+			!ctx.hasUI ||
+			isNonInteractiveMode ||
+			(installedEditorFactory !== undefined && currentEditorFactory === installedEditorFactory)
+		) {
+			return;
+		}
 
-		const factory = (
-			tui: TUI,
-			theme: EditorTheme,
-			keybindings: ConstructorParameters<typeof CustomEditor>[2],
-		) => new SkillArgumentHintEditor(pi, tui, theme, keybindings);
+		const baseFactory = currentEditorFactory;
+		const factory: EditorFactory = (tui, theme, keybindings) => {
+			const editor = baseFactory?.(tui, theme, keybindings) ?? new CustomEditor(tui, theme, keybindings);
+			return addArgumentHints(editor, pi, tui);
+		};
 
+		previousEditorFactory = baseFactory;
 		installedEditorFactory = factory;
 		ctx.ui.setEditorComponent(factory);
 	});
 
 	pi.on("session_shutdown", (_event, ctx) => {
 		if (ctx.ui.getEditorComponent() === installedEditorFactory) {
-			ctx.ui.setEditorComponent(previousEditorFactory as Parameters<typeof ctx.ui.setEditorComponent>[0]);
+			ctx.ui.setEditorComponent(previousEditorFactory);
 		}
+		previousEditorFactory = undefined;
+		installedEditorFactory = undefined;
 	});
 }

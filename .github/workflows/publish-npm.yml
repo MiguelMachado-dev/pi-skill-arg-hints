@@ -62,6 +62,9 @@ jobs:
       - name: Typecheck
         run: pnpm run check
 
+      - name: Test
+        run: pnpm test
+
       - name: Configure release git author
         if: ${{ !inputs.dry_run && inputs.version_bump != 'none' }}
         run: |
