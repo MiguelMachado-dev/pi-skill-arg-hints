@@ -10,7 +10,7 @@ devDependencies:
     version: 0.84.1(zod@4.4.3)
   '@earendil-works/pi-tui':
     specifier: ^0.84.1
-    version: 0.84.1
+    version: 0.84.4
   '@types/node':
     specifier: ^25.9.1
     version: 25.9.2
@@ -400,7 +400,7 @@ packages:
       '@earendil-works/pi-ai': 0.84.1(zod@4.4.3)
       '@earendil-works/pi-client': 0.84.1
       '@earendil-works/pi-protocol': 0.84.1
-      '@earendil-works/pi-tui': 0.84.1
+      '@earendil-works/pi-tui': 0.84.4
       '@silvia-odwyer/photon-node': 0.3.4
       chalk: 5.6.2
       cross-spawn: 7.0.6
@@ -440,8 +440,8 @@ packages:
     engines: {node: '>=22.19.0'}
     dev: true
 
-  /@earendil-works/pi-tui@0.84.1:
-    resolution: {integrity: sha512-udeXFbgEhJ6JiB0uguwNVNkDy2FENfmtQwPcY+/iJ8GWeq18wkal1tKqa5YyeH0IqtX1vG0cGh8zfSYzyzVuLA==}
+  /@earendil-works/pi-tui@0.84.4:
+    resolution: {integrity: sha512-nPUnwDkLtupPXnZQYrCwPFcuTydCDqTY6ZbFqhsL4S4kVq0AT418kPa/6uXwtaCD+MjBNBltb7ScTYX65yeE1w==}
     engines: {node: '>=22.19.0'}
     dependencies:
       get-east-asian-width: 1.6.0
